@@ -564,6 +564,12 @@ function Transform:draw(stencilValue)
 	love.graphics.pop()
 end
 
+--[[
+	This class isn't useful on its own (you wouldn't
+	instantiate it directly), but it provides some useful
+	boilerplate for elements that draw a love.graphics
+	primitive and have a fill color and outline.
+]]
 local Shape = newElementClass(Element)
 
 function Shape:fillColor(r, g, b, a)
@@ -624,6 +630,66 @@ function Ellipse:drawShape(mode)
 		self:get 'width' / 2, self:get 'height' / 2,
 		self:get 'width' / 2, self:get 'height' / 2,
 		self._segments)
+end
+
+--[[
+	This class isn't useful on its own, but it provides
+	shared functionality for shapes that are made up
+	of user-defined points.
+]]
+local Points = newElementClass(Shape)
+
+function Points:new(...)
+	local left, top, right, bottom
+	self._points = self._points or {}
+	-- for each point...
+	for i = 1, select('#', ...), 2 do
+		local x = select(i, ...)
+		local y = select(i + 1, ...)
+		-- adjust the bounds to surround all points
+		left = left and math.min(left, x) or x
+		top = top and math.min(top, y) or y
+		right = right and math.max(right, x) or x
+		bottom = bottom and math.max(bottom, y) or y
+		-- add the point to the table
+		table.insert(self._points, x)
+		table.insert(self._points, y)
+	end
+	-- shift the points so the top-left is at (0, 0)
+	for i = 1, #self._points, 2 do
+		self._points[i] = self._points[i] - left
+		self._points[i + 1] = self._points[i + 1] - top
+	end
+	-- set the dimensions
+	self._x = left
+	self._y = top
+	self._naturalWidth = right - left
+	self._naturalHeight = bottom - top
+	self._width = self._naturalWidth
+	self._height = self._naturalHeight
+end
+
+function Points:scaleX(scale)
+	self:width(self._naturalWidth * scale)
+end
+
+function Points:scaleY(scale)
+	self:height(self._naturalHeight * scale)
+end
+
+function Points:scale(scaleX, scaleY)
+	self:scaleX(scaleX)
+	self:scaleY(scaleY or scaleX)
+end
+
+local Polygon = newElementClass(Points)
+
+function Polygon:drawShape(mode)
+	love.graphics.push 'all'
+	love.graphics.scale(self:get 'width' / self._naturalWidth,
+		self:get 'height' / self._naturalHeight)
+	love.graphics.polygon(mode, self._points)
+	love.graphics.pop()
 end
 
 local Image = newElementClass(Element)
@@ -829,6 +895,8 @@ local elementClasses = {
 	shape = Shape,
 	rectangle = Rectangle,
 	ellipse = Ellipse,
+	points = Points,
+	polygon = Polygon,
 	image = Image,
 	text = Text,
 	paragraph = Paragraph,
